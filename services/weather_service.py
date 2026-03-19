@@ -1,5 +1,7 @@
 from bson import ObjectId
 import requests
+import csv
+from io import StringIO
 from datetime import date, timedelta
 from entities.weather_request import WeatherRequest
 from fastapi import HTTPException
@@ -17,8 +19,8 @@ class WeatherService:
         self.collection = self.db["weather_data"]
 
 
-    def find_weather_request_by_city(self, city: str) -> list[RequestModel]:
-        weather_data = self.collection.find({"city": city.lower()})
+    def find_weather_request_by_city(self, city: str, country: str) -> list[RequestModel]:
+        weather_data = self.collection.find({"city": city.lower(), "country": country.upper()})
 
         list_data = []
 
@@ -31,10 +33,10 @@ class WeatherService:
         return list_data
 
 
-    def get_city_weather_by_date_range(self, city: str, start_date: date, end_date: date) -> WeatherRequest:
+    def get_city_weather_by_date_range(self, city: str, country: str, start_date: date, end_date: date) -> WeatherRequest:
         self._validate_date_range(start_date, end_date)
         
-        latitude, longitude = self._get_city_coordinates(city)
+        latitude, longitude = self._get_city_coordinates(city, country)
         params = {
             'latitude': latitude,
             'longitude': longitude,
@@ -45,20 +47,20 @@ class WeatherService:
         }
 
         try:
-            weather_request = self._get_weather_request(URL_OPEN_METEO_ARCHIVE, params, city, start_date, end_date)
+            weather_request = self._get_weather_request(URL_OPEN_METEO_ARCHIVE, params, city, country, start_date, end_date)
 
             self.collection.insert_one(weather_request.model_dump())
 
             return weather_request
         
         except requests.exceptions.RequestException as e:
-            raise HTTPException(status_code=400, detail=f"Could not retrieve weather data for city: {city} and date range: {start_date} to {end_date}. \nError: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Could not retrieve weather data for city: {city}, country: {country}, and date range: {start_date} to {end_date}. \nError: {str(e)}")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")           
 
 
-    def get_forecast_5_days(self, city: str) -> WeatherRequest:
-        latitude, longitude = self._get_city_coordinates(city)
+    def get_forecast_5_days(self, city: str, country: str) -> WeatherRequest:
+        latitude, longitude = self._get_city_coordinates(city, country)
 
         params = {
             'latitude': latitude,
@@ -68,7 +70,7 @@ class WeatherService:
         }
 
         try:
-            weather_request = self._get_weather_request(URL_OPEN_METEO_FORECAST, params, city, date.today(), date.today() + timedelta(days=4))
+            weather_request = self._get_weather_request(URL_OPEN_METEO_FORECAST, params, city, country, date.today(), date.today() + timedelta(days=4))
 
             self.collection.insert_one(weather_request.model_dump())
 
@@ -88,7 +90,7 @@ class WeatherService:
 
         self._validate_date_range(date.fromisoformat(update_model.start_date), date.fromisoformat(update_model.end_date))
 
-        latitude, longitude = self._get_city_coordinates(update_model.city)
+        latitude, longitude = self._get_city_coordinates(update_model.city, update_model.country)
 
         params = {
             'latitude': latitude,
@@ -100,7 +102,8 @@ class WeatherService:
         }
 
         try:
-            new_request: WeatherRequest = self._get_weather_request(URL_OPEN_METEO_ARCHIVE, params, update_model.city, update_model.start_date, update_model.end_date)
+            new_request: WeatherRequest = self._get_weather_request(URL_OPEN_METEO_ARCHIVE, params, update_model.city, 
+                                                                    update_model.country, update_model.start_date, update_model.end_date)
 
             self.collection.update_one(
                 {"_id": ObjectId(id)},
@@ -113,7 +116,7 @@ class WeatherService:
         except requests.exceptions.RequestException as e:
             raise HTTPException(
                 status_code=400, 
-                detail=f"Could not update weather data for city: {update_model.city} and date range: {update_model.start_date} to {update_model.end_date}. \nError: {str(e)}")
+                detail=f"Could not update weather data for city: {update_model.city}, country: {update_model.country}, and date range: {update_model.start_date} to {update_model.end_date}. \nError: {str(e)}")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
@@ -127,20 +130,57 @@ class WeatherService:
         return {"message": f"Weather request with id {id} has been deleted successfully"}
 
 
-    def _get_city_coordinates(self, city: str) -> tuple:
+    def _get_city_coordinates(self, city: str, country: str) -> tuple:
         params = {
             'name': city.lower(),
-            'count': 1
+            'countryCode': country.upper(),
+            'count': 100
         }
 
-        response = requests.get(URL_OPEN_METEO_SEARCH, params=params)
-        data = response.json()
+        try:
+            response = requests.get(URL_OPEN_METEO_SEARCH, params=params)
+            data = response.json()
+        except:
+            raise HTTPException(status_code=400, detail=f"Could not retrieve coordinates for city: {city} and country: {country}")
             
         if "results" in data:
             result = data['results'][0]
             return result['latitude'], result['longitude']
         else:
-            raise HTTPException(status_code=404, detail=f"City not found: {city}")
+            raise HTTPException(status_code=404, detail=f"City not found in country {country}: {city}")
+
+
+    def export_data_csv_by_id(self, id: str):
+        request = self.collection.find_one({"_id": ObjectId(id)})
+
+        if not request:
+            raise HTTPException(status_code=404, detail=f"Weather request with id {id} not found")
+
+        file_csv = StringIO()
+        writer = csv.writer(file_csv)
+
+        writer.writerow([
+            "city",
+            "country",
+            "date",
+            "temperature_min",
+            "temperature_max",
+            "precipitation_sum"
+        ])
+
+        for day in request["weather_data"]:
+            writer.writerow([
+                request["city"],
+                request["country"],
+                day["date"],
+                day["temperature_min"],
+                day["temperature_max"],
+                day["precipitation_sum"]
+            ])
+
+        file_csv.seek(0)
+
+        return file_csv, request["city"].replace(" ", "_"), request["country"].upper()
 
 
     def _validate_date_range(self, start_date: date, end_date: date):
@@ -151,14 +191,14 @@ class WeatherService:
             raise HTTPException(status_code=400, detail="Dates cannot be in the future")
         
 
-    def _get_weather_request(self, url: str, params: dict, city: str, start_date: date, end_date: date) -> WeatherRequest:
+    def _get_weather_request(self, url: str, params: dict, city: str, country: str, start_date: date, end_date: date) -> WeatherRequest:
             response = requests.get(url, params=params)
             data = response.json()
 
             daily = data.get("daily", {})
 
             if not daily or not daily.get("time"):
-                raise HTTPException(status_code=404, detail=f"No weather data found for {city}")
+                raise HTTPException(status_code=404, detail=f"No weather data found for {city} in country {country}")
 
             _weather_data = []
 
@@ -184,8 +224,11 @@ class WeatherService:
 
             weather_request = WeatherRequest(
                 city=city.lower(),
+                country=country.upper(),
                 start_date=str(start_date),
                 end_date=str(end_date),
+                map_url=f"https://maps.google.com/?q={params['latitude']},{params['longitude']}",
+                youtube_url=f"https://www.youtube.com/results?search_query={city.lower().replace(' ', '+')}+{country.upper()}",
                 weather_data=_weather_data
             )
 

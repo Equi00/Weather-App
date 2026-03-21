@@ -6,13 +6,17 @@ import {
   Spacer,
   VStack,
   useDisclosure,
+  Button,
 } from "@chakra-ui/react";
-import { EditIcon, DeleteIcon } from "@chakra-ui/icons";
-import { Tag, TagLabel, TagCloseButton } from "@chakra-ui/react";
+import { EditIcon, DeleteIcon, DownloadIcon } from "@chakra-ui/icons";
 import DataModal from "./modals/dataModal";
+import DeleteModal from "./modals/deleteModal";
+import CreateModal from "./modals/createModal";
 
-export default function WeatherDataCard({ weather }) {
+export default function WeatherDataCard({ weather, deleteFunction, updateFunction, exportFunction }) {
   const {isOpen: isOpenData, onOpen: onOpenData, onClose: onCloseData} = useDisclosure();
+  const {isOpen: isOpenDelete, onOpen: onOpenDelete, onClose: onCloseDelete} = useDisclosure();
+  const {isOpen: isOpenUpdate, onOpen: onOpenUpdate, onClose: onCloseUpdate} = useDisclosure();
 
   return (
     <Box
@@ -37,9 +41,30 @@ export default function WeatherDataCard({ weather }) {
         <Text width={"100%"}>End Date: {weather.end_date}</Text>
       </VStack>
       <HStack display={"flex"} width={"100%"} justifyContent={"space-around"}>
-          <EditIcon color={"teal"} onClick={() => console.log("apretado")}></EditIcon>
-          <DeleteIcon color={"red"} onClick={() => console.log("apretado")}></DeleteIcon>
+          <Button variant="outline">
+            <EditIcon color={"teal"} onClick={() => onOpenUpdate()}></EditIcon>
+          </Button>
+          <Button variant="outline">
+            <DeleteIcon color={"red"} onClick={() => onOpenDelete()}></DeleteIcon>
+          </Button>
+          <Button variant="outline">
+              <DownloadIcon onClick={() => exportFunction(weather.id)}/> 
+          </Button>
+          
       </HStack>
+
+      <DeleteModal
+            isOpen={isOpenDelete}
+            onClose={onCloseDelete}
+            deleteFunction={deleteFunction}
+            weatherId={weather.id}/>
+
+      <CreateModal
+            isOpen={isOpenUpdate}
+            onClose={onCloseUpdate}
+            updateFunction={updateFunction}
+            weatherData={weather}
+            />
 
       <DataModal
             isOpen={isOpenData}

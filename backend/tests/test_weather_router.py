@@ -125,6 +125,20 @@ def test_update_weather_request_by_id_success(service):
     assert saved_data["end_date"] == updated_data["end_date"]
 
 
+def test_update_weather_request_by_id_whitout_dates(service):
+    create_request = client.get("/api/weather/country/city/date-range", 
+                                params={"city": "buenos aires", "country": "AR", "start_date": "2024-01-01", "end_date": "2024-01-03"})
+    assert create_request.status_code == 200
+
+    request_found = client.get("/api/weather/country/city", params={"city": "buenos aires", "country": "AR"})
+    data = request_found.json()
+
+    update_model = UpdateModel(city="cordoba", country="AR", start_date="", end_date="")
+    response = client.put(f"/api/weather/{data[0]['id']}", json=update_model.model_dump())
+    
+    assert response.status_code == 200
+
+
 def test_delete_weather_request_by_id_success(service):
     create_request = client.get("/api/weather/country/city/date-range", 
                                 params={"city": "buenos aires", "country": "AR", "start_date": "2024-01-01", "end_date": "2024-01-03"})

@@ -97,27 +97,44 @@ class WeatherService:
 
     def update_weather_request_by_id(self, id: str, update_model: UpdateModel) -> RequestModel:
         self._validate_parameters(update_model.city, update_model.country)
+        has_dates = True
+        
         old_request = self.collection.find_one({"_id": ObjectId(id)})
 
         if not old_request:
             raise HTTPException(status_code=404, detail=f"Weather request with id {id} not found")
-
-        self._validate_date_range(update_model.start_date, update_model.end_date)
-
+        
         latitude, longitude = self._get_city_coordinates(update_model.city, update_model.country)
 
-        params = {
+        if update_model.start_date and update_model.end_date:
+            self._validate_date_range(update_model.start_date, update_model.end_date)
+
+            params = {
+                'latitude': latitude,
+                'longitude': longitude,
+                'start_date': update_model.start_date,
+                'end_date': update_model.end_date,
+                'daily': 'temperature_2m_min,temperature_2m_max,precipitation_sum',
+                'timezone': 'auto'
+            }
+            
+        else:
+            has_dates = False
+            params = {
             'latitude': latitude,
             'longitude': longitude,
-            'start_date': update_model.start_date,
-            'end_date': update_model.end_date,
             'daily': 'temperature_2m_min,temperature_2m_max,precipitation_sum',
             'timezone': 'auto'
-        }
+            }
+
 
         try:
-            new_request: WeatherRequest = self._get_weather_request(URL_OPEN_METEO_ARCHIVE, params, update_model.city, 
+            if has_dates:
+                new_request: WeatherRequest = self._get_weather_request(URL_OPEN_METEO_ARCHIVE, params, update_model.city, 
                                                                     update_model.country, update_model.start_date, update_model.end_date)
+            else:
+                new_request: WeatherRequest = self._get_weather_request(URL_OPEN_METEO_FORECAST, params, update_model.city, 
+                                                                        update_model.country, date.today(), date.today() + timedelta(days=4))
 
             self.collection.update_one(
                 {"_id": ObjectId(id)},

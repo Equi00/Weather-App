@@ -1,7 +1,7 @@
 import { SimpleGrid, Text } from "@chakra-ui/react";
 import WeatherDataCard from "./weatherDataCard";
 
-export default function WeatherDataCardList({ weathers }) {
+export default function WeatherDataCardList({ weathers, deleteFunction, updateFunction, exportFunction }) {
   if (weathers.length === 0) {
     return <Text>Weather data list empty.</Text>;
   }
@@ -12,6 +12,9 @@ export default function WeatherDataCardList({ weathers }) {
         <WeatherDataCard
           key={weather.id}
           weather={weather}
+          deleteFunction={deleteFunction}
+          updateFunction={updateFunction}
+          exportFunction={exportFunction}
         />
       ))}
     </SimpleGrid>

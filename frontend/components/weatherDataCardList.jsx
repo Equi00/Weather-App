@@ -7,7 +7,7 @@ export default function WeatherDataCardList({ weathers }) {
   }
 
   return (
-    <SimpleGrid columns={{ base: 1, sm: 2, md: 3 }} spacing={4}>
+    <SimpleGrid spacing={4}>
       {weathers.map((weather) => (
         <WeatherDataCard
           key={weather.id}

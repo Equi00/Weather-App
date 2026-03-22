@@ -23,8 +23,8 @@ export default function DataModal({isOpen, onClose, data}){
                 </Link>
             </ModalHeader>
              
-            <ModalBody>
-                <Table size="sm">
+            <ModalBody overflowX={"auto"}>
+                <Table size="sm" minW={"400px"}>
                     <Thead>
                         <Tr>
                         <Th>Date</Th>
@@ -40,7 +40,7 @@ export default function DataModal({isOpen, onClose, data}){
                             <Td width={"100%"}>{item.date}</Td>
                             <Td>{item.temperature_max}°C</Td>
                             <Td>{item.temperature_min}°C</Td>
-                            <Td display="grid" isNumeric>
+                            <Td isNumeric>
                                 {item.precipitation_sum === 0
                                     ? "0 mm ☀️"
                                     : item.precipitation_sum < 5

@@ -125,9 +125,22 @@ function App() {
     <Container display={"flex"}>
       <VStack width={'100vw'} height={"100vh"}>
 
-        <Heading display={"flex"} alignItems={"center"} gap={"1rem"} marginBottom={"5rem"} marginTop={"2rem"}>
-          <MoonIcon color={"blue.600"}/> Weather App <SunIcon color={"goldenrod"}/>
+        <Heading
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          gap={{ base: "0.5rem", md: "1rem" }}
+          mb={{ base: "2rem", md: "5rem" }}
+          mt={{ base: "1rem", md: "2rem" }}
+          fontSize={{ base: "lg", sm: "xl", md: "2xl", lg: "3xl" }}
+        >
+          <MoonIcon color="blue.600" />
+          Weather App
+          <SunIcon color="goldenrod" />
         </Heading>
+        <Text fontSize="sm" textAlign="center">
+          The Product Manager Accelerator Program is designed to support PM professionals through every stage of their careers. From students looking for entry-level jobs to Directors looking to take on a leadership role, this program has helped over hundreds of students fulfill their career aspirations.
+        </Text>
         <Text fontSize={"lg"}>Search for weather data by city and country</Text>
 
         <Input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />

@@ -108,9 +108,12 @@ http://localhost:5173
 ## Stopping the Application
 
 From the project root, run:
-- ./run.sh
+- ./stop.sh
 
 ## Starting and stopping the Application from local
+
+Start the database with:
+- docker compose -f docker/docker_compose_db.yml up --build -d
 
 From the backend folder, run:
 - uvicorn main:app --reload

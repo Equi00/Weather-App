@@ -1,12 +1,15 @@
 from bson import ObjectId
 import requests
 import csv
+import logging
 from io import StringIO
 from datetime import date, timedelta
 from entities.weather_request import WeatherRequest
 from fastapi import HTTPException
 from models.request_model import RequestModel
 from models.update_model import UpdateModel
+
+logging.basicConfig(level=logging.INFO)
 
 URL_OPEN_METEO_SEARCH = "https://geocoding-api.open-meteo.com/v1/search"
 URL_OPEN_METEO_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
@@ -20,6 +23,8 @@ class WeatherService:
 
 
     def find_weather_request_by_city(self, city: str, country: str) -> list[RequestModel]:
+        self._validate_parameters(city, country)
+
         weather_data = self.collection.find({"city": city.lower(), "country": country.upper()})
 
         list_data = []
@@ -33,7 +38,8 @@ class WeatherService:
         return list_data
 
 
-    def get_city_weather_by_date_range(self, city: str, country: str, start_date: date, end_date: date) -> WeatherRequest:
+    def get_city_weather_by_date_range(self, city: str, country: str, start_date: date | str, end_date: date | str) -> RequestModel:
+        self._validate_parameters(city, country)        
         self._validate_date_range(start_date, end_date)
         
         latitude, longitude = self._get_city_coordinates(city, country)
@@ -49,9 +55,12 @@ class WeatherService:
         try:
             weather_request = self._get_weather_request(URL_OPEN_METEO_ARCHIVE, params, city, country, start_date, end_date)
 
-            self.collection.insert_one(weather_request.model_dump())
+            result = self.collection.insert_one(weather_request.model_dump())
 
-            return weather_request
+            return RequestModel(
+                id=str(result.inserted_id),
+                **weather_request.model_dump()
+            )
         
         except requests.exceptions.RequestException as e:
             raise HTTPException(status_code=400, detail=f"Could not retrieve weather data for city: {city}, country: {country}, and date range: {start_date} to {end_date}. \nError: {str(e)}")
@@ -59,7 +68,8 @@ class WeatherService:
             raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")           
 
 
-    def get_forecast_5_days(self, city: str, country: str) -> WeatherRequest:
+    def get_forecast_5_days(self, city: str, country: str) -> RequestModel:
+        self._validate_parameters(city, country)        
         latitude, longitude = self._get_city_coordinates(city, country)
 
         params = {
@@ -72,9 +82,12 @@ class WeatherService:
         try:
             weather_request = self._get_weather_request(URL_OPEN_METEO_FORECAST, params, city, country, date.today(), date.today() + timedelta(days=4))
 
-            self.collection.insert_one(weather_request.model_dump())
+            result = self.collection.insert_one(weather_request.model_dump())
 
-            return weather_request
+            return RequestModel(
+                id=str(result.inserted_id),
+                **weather_request.model_dump()
+            )
         
         except requests.exceptions.RequestException as e:
             raise HTTPException(status_code=400, detail=f"Could not retrieve 5-day forecast data. \nError: {str(e)}")
@@ -82,28 +95,46 @@ class WeatherService:
             raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 
-    def update_weather_request_by_id(self, id: str, update_model: UpdateModel) -> WeatherRequest:
+    def update_weather_request_by_id(self, id: str, update_model: UpdateModel) -> RequestModel:
+        self._validate_parameters(update_model.city, update_model.country)
+        has_dates = True
+        
         old_request = self.collection.find_one({"_id": ObjectId(id)})
 
         if not old_request:
             raise HTTPException(status_code=404, detail=f"Weather request with id {id} not found")
-
-        self._validate_date_range(date.fromisoformat(update_model.start_date), date.fromisoformat(update_model.end_date))
-
+        
         latitude, longitude = self._get_city_coordinates(update_model.city, update_model.country)
 
-        params = {
+        if update_model.start_date and update_model.end_date:
+            self._validate_date_range(update_model.start_date, update_model.end_date)
+
+            params = {
+                'latitude': latitude,
+                'longitude': longitude,
+                'start_date': update_model.start_date,
+                'end_date': update_model.end_date,
+                'daily': 'temperature_2m_min,temperature_2m_max,precipitation_sum',
+                'timezone': 'auto'
+            }
+            
+        else:
+            has_dates = False
+            params = {
             'latitude': latitude,
             'longitude': longitude,
-            'start_date': update_model.start_date,
-            'end_date': update_model.end_date,
             'daily': 'temperature_2m_min,temperature_2m_max,precipitation_sum',
             'timezone': 'auto'
-        }
+            }
+
 
         try:
-            new_request: WeatherRequest = self._get_weather_request(URL_OPEN_METEO_ARCHIVE, params, update_model.city, 
+            if has_dates:
+                new_request: WeatherRequest = self._get_weather_request(URL_OPEN_METEO_ARCHIVE, params, update_model.city, 
                                                                     update_model.country, update_model.start_date, update_model.end_date)
+            else:
+                new_request: WeatherRequest = self._get_weather_request(URL_OPEN_METEO_FORECAST, params, update_model.city, 
+                                                                        update_model.country, date.today(), date.today() + timedelta(days=4))
 
             self.collection.update_one(
                 {"_id": ObjectId(id)},
@@ -111,7 +142,10 @@ class WeatherService:
                 upsert=False
             )
 
-            return new_request
+            return RequestModel(
+                id=id,
+                **new_request.model_dump()
+            )
         
         except requests.exceptions.RequestException as e:
             raise HTTPException(
@@ -128,26 +162,6 @@ class WeatherService:
             raise HTTPException(status_code=404, detail=f"Weather request with id {id} not found")
 
         return {"message": f"Weather request with id {id} has been deleted successfully"}
-
-
-    def _get_city_coordinates(self, city: str, country: str) -> tuple:
-        params = {
-            'name': city.lower(),
-            'countryCode': country.upper(),
-            'count': 100
-        }
-
-        try:
-            response = requests.get(URL_OPEN_METEO_SEARCH, params=params)
-            data = response.json()
-        except:
-            raise HTTPException(status_code=400, detail=f"Could not retrieve coordinates for city: {city} and country: {country}")
-            
-        if "results" in data:
-            result = data['results'][0]
-            return result['latitude'], result['longitude']
-        else:
-            raise HTTPException(status_code=404, detail=f"City not found in country {country}: {city}")
 
 
     def export_data_csv_by_id(self, id: str):
@@ -181,13 +195,41 @@ class WeatherService:
         file_csv.seek(0)
 
         return file_csv, request["city"].replace(" ", "_"), request["country"].upper()
+    
+
+    def _validate_parameters(self, city: str, country: str):
+        if not city or not country:
+            raise HTTPException(status_code=400, detail="City and country parameters are required")
 
 
-    def _validate_date_range(self, start_date: date, end_date: date):
-        if start_date > end_date:
+    def _get_city_coordinates(self, city: str, country: str) -> tuple:
+        params = {
+            'name': city.lower(),
+            'countryCode': country.upper(),
+            'count': 100
+        }
+
+        try:
+            response = requests.get(URL_OPEN_METEO_SEARCH, params=params)
+            data = response.json()
+        except:
+            raise HTTPException(status_code=400, detail=f"Could not retrieve coordinates for city: {city} and country: {country}")
+            
+        if "results" in data:
+            result = data['results'][0]
+            return result['latitude'], result['longitude']
+        else:
+            raise HTTPException(status_code=404, detail=f"City not found in country {country}: {city}")
+
+
+    def _validate_date_range(self, start_date: date | str, end_date: date | str):
+        if not start_date or not end_date:
+            raise HTTPException(status_code=400, detail="Dates parameter are required")
+
+        if date.fromisoformat(start_date) > date.fromisoformat(end_date):
             raise HTTPException(status_code=400, detail="Start date must be before end date")
         
-        if start_date > date.today() or end_date > date.today():
+        if date.fromisoformat(start_date) > date.today() or date.fromisoformat(end_date) > date.today():
             raise HTTPException(status_code=400, detail="Dates cannot be in the future")
         
 

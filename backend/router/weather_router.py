@@ -12,7 +12,7 @@ def get_weather_service(db = Depends(get_db)):
     return WeatherService(db)
 
 
-@router.get("/country/{country}/city/{city}", response_model=list[RequestModel])
+@router.get("/country/city", response_model=list[RequestModel])
 def get_weather_request_by_city(
     city: str, 
     country: str,
@@ -21,18 +21,18 @@ def get_weather_request_by_city(
     return service.find_weather_request_by_city(city, country)
 
 
-@router.get("/country/{country}/city/{city}/date-range")
+@router.get("/country/city/date-range", response_model=RequestModel)
 def get_city_weather_by_date_range(
     city: str, 
     country: str,
-    start_date: date, 
-    end_date: date, 
+    start_date: date | str, 
+    end_date: date | str, 
     service: WeatherService = Depends(get_weather_service)):
 
     return service.get_city_weather_by_date_range(city, country, start_date, end_date)
 
 
-@router.get("/country/{country}/city/{city}/forecast")
+@router.get("/country/city/forecast", response_model=RequestModel)
 def get_forecast_5_days(
     city: str, 
     country: str,
@@ -41,7 +41,7 @@ def get_forecast_5_days(
     return service.get_forecast_5_days(city, country)
 
 
-@router.put("/{id}")
+@router.put("/{id}", response_model=RequestModel)
 def update_weather_request_by_id(
     id: str,
     update_model: UpdateModel,

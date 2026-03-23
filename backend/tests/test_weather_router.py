@@ -11,6 +11,7 @@ from models.update_model import UpdateModel
 client = TestClient(app)
 
 
+
 @pytest.fixture(scope="function")
 def db():
     client = MongoClient("localhost", 27017)
@@ -36,13 +37,15 @@ def service(db):
 
 
 def test_get_weather_request_by_city_success(service):
-    response = client.get("/api/weather/country/AR/city/cordoba/date-range?start_date=2026-02-13&end_date=2026-02-19")
+    response = client.get("/api/weather/country/city/date-range", 
+                          params={"city": "cordoba", "country": "AR", "start_date": "2024-01-01", "end_date": "2024-01-03"})
+    
 
     assert response.status_code == 200
 
     weather_request = response.json()
 
-    response = client.get("/api/weather/country/ar/city/cordoba")
+    response = client.get("/api/weather/country/city", params={"city": "cordoba", "country": "AR"})
 
     assert response.status_code == 200
 
@@ -55,7 +58,8 @@ def test_get_weather_request_by_city_success(service):
 
 
 def test_get_city_weather_by_date_range_success(service):
-    response = client.get("/api/weather/country/AR/city/Buenos Aires/date-range?start_date=2024-01-01&end_date=2024-01-03")
+    response = client.get("/api/weather/country/city/date-range", 
+                          params={"city": "buenos aires", "country": "AR", "start_date": "2024-01-01", "end_date": "2024-01-03"})
     
     assert response.status_code == 200
 
@@ -78,7 +82,7 @@ def test_get_city_weather_by_date_range_success(service):
 
 
 def test_get_forecast_5_days_success(service):
-    response = client.get("/api/weather/country/AR/city/Buenos Aires/forecast")
+    response = client.get("/api/weather/country/city/forecast", params={"city": "buenos aires", "country": "AR"})
 
     assert response.status_code == 200
 
@@ -99,10 +103,11 @@ def test_get_forecast_5_days_success(service):
 
 
 def test_update_weather_request_by_id_success(service):
-    create_request = client.get("/api/weather/country/AR/city/Buenos Aires/date-range?start_date=2024-01-01&end_date=2024-01-03")
+    create_request = client.get("/api/weather/country/city/date-range", 
+                                params={"city": "buenos aires", "country": "AR", "start_date": "2024-01-01", "end_date": "2024-01-03"})
     assert create_request.status_code == 200
 
-    request_found = client.get("/api/weather/country/AR/city/Buenos Aires")
+    request_found = client.get("/api/weather/country/city", params={"city": "buenos aires", "country": "AR"})
     data = request_found.json()
 
     update_model = UpdateModel(city="cordoba", country="ES", start_date="2024-01-06", end_date="2024-01-10")
@@ -120,11 +125,26 @@ def test_update_weather_request_by_id_success(service):
     assert saved_data["end_date"] == updated_data["end_date"]
 
 
-def test_delete_weather_request_by_id_success(service):
-    create_request = client.get("/api/weather/country/AR/city/Buenos Aires/date-range?start_date=2024-01-01&end_date=2024-01-03")
+def test_update_weather_request_by_id_whitout_dates(service):
+    create_request = client.get("/api/weather/country/city/date-range", 
+                                params={"city": "buenos aires", "country": "AR", "start_date": "2024-01-01", "end_date": "2024-01-03"})
     assert create_request.status_code == 200
 
-    request_found = client.get("/api/weather/country/AR/city/Buenos Aires")
+    request_found = client.get("/api/weather/country/city", params={"city": "buenos aires", "country": "AR"})
+    data = request_found.json()
+
+    update_model = UpdateModel(city="cordoba", country="AR", start_date="", end_date="")
+    response = client.put(f"/api/weather/{data[0]['id']}", json=update_model.model_dump())
+    
+    assert response.status_code == 200
+
+
+def test_delete_weather_request_by_id_success(service):
+    create_request = client.get("/api/weather/country/city/date-range", 
+                                params={"city": "buenos aires", "country": "AR", "start_date": "2024-01-01", "end_date": "2024-01-03"})
+    assert create_request.status_code == 200
+
+    request_found = client.get("/api/weather/country/city", params={"city": "buenos aires", "country": "AR"})
     data = request_found.json()
 
     delete_response = client.delete(f"/api/weather/{data[0]['id']}")
@@ -138,10 +158,11 @@ def test_delete_weather_request_by_id_success(service):
 
 
 def test_download_csv_by_id_success(service):
-    create_request = client.get("/api/weather/country/AR/city/Buenos Aires/date-range?start_date=2024-01-01&end_date=2024-01-03")
+    create_request = client.get("/api/weather/country/city/date-range", 
+                                params={"city": "buenos aires", "country": "AR", "start_date": "2024-01-01", "end_date": "2024-01-03"})
     assert create_request.status_code == 200
 
-    request_found = client.get("/api/weather/country/AR/city/Buenos Aires")
+    request_found = client.get("/api/weather/country/city", params={"city": "buenos aires", "country": "AR"})
     data = request_found.json()
 
     response = client.get(f"/api/weather/{data[0]['id']}/export/csv")
@@ -172,10 +193,11 @@ def test_update_weather_request_by_id_not_found(service):
 
 
 def test_update_weather_request_by_id_invalid_dates(service):
-    create_request = client.get("/api/weather/country/AR/city/Buenos Aires/date-range?start_date=2024-01-01&end_date=2024-01-03")
+    create_request = client.get("/api/weather/country/city/date-range", 
+                                params={"city": "buenos aires", "country": "AR", "start_date": "2024-01-01", "end_date": "2024-01-03"})
     assert create_request.status_code == 200
 
-    request_found = client.get("/api/weather/country/AR/city/Buenos Aires")
+    request_found = client.get("/api/weather/country/city", params={"city": "buenos aires", "country": "AR"})
     data = request_found.json()
 
     update_model = UpdateModel(city="cordoba", country="AR", start_date="2024-01-10", end_date="2024-01-06")
@@ -186,10 +208,11 @@ def test_update_weather_request_by_id_invalid_dates(service):
 
 
 def test_update_weather_request_by_id_invalid_city(service):
-    create_request = client.get("/api/weather/country/AR/city/Buenos Aires/date-range?start_date=2024-01-01&end_date=2024-01-03")
+    create_request = client.get("/api/weather/country/city/date-range", 
+                                params={"city": "buenos aires", "country": "AR", "start_date": "2024-01-01", "end_date": "2024-01-03"})
     assert create_request.status_code == 200
 
-    request_found = client.get("/api/weather/country/AR/city/Buenos Aires")
+    request_found = client.get("/api/weather/country/city", params={"city": "buenos aires", "country": "AR"})
     data = request_found.json()
 
     update_model = UpdateModel(city="InvalidCityName123", country="AR", start_date="2024-01-06", end_date="2024-01-10")
@@ -200,10 +223,11 @@ def test_update_weather_request_by_id_invalid_city(service):
 
 
 def test_update_weather_request_by_id_future_dates(service):
-    create_request = client.get("/api/weather/country/AR/city/Buenos Aires/date-range?start_date=2024-01-01&end_date=2024-01-03")
+    create_request = client.get("/api/weather/country/city/date-range", 
+                                params={"city": "buenos aires", "country": "AR", "start_date": "2024-01-01", "end_date": "2024-01-03"})
     assert create_request.status_code == 200
 
-    request_found = client.get("/api/weather/country/AR/city/Buenos Aires")
+    request_found = client.get("/api/weather/country/city", params={"city": "buenos aires", "country": "AR"})
     data = request_found.json()
 
     future_date = (date.today() + timedelta(days=10)).isoformat()
@@ -215,7 +239,7 @@ def test_update_weather_request_by_id_future_dates(service):
 
 
 def test_get_forecast_5_days_invalid_city(service):
-    response = client.get("/api/weather/country/AR/city/InvalidCityName123/forecast")
+    response = client.get("/api/weather/country/city/forecast", params={"city": "InvalidCityName123", "country": "AR"})
     
     assert response.status_code == 404
     assert response.json()["detail"] == "City not found in country AR: InvalidCityName123"
@@ -223,21 +247,58 @@ def test_get_forecast_5_days_invalid_city(service):
 
 def test_get_city_weather_by_date_range_future_dates(service):
     future_date = (date.today() + timedelta(days=10)).isoformat()
-    response = client.get(f"/api/weather/country/AR/city/Buenos Aires/date-range?start_date={future_date}&end_date={future_date}")
+    response = client.get(f"/api/weather/country/city/date-range", params={"city": "Buenos Aires", "country": "AR", "start_date": future_date, "end_date": future_date})
     
     assert response.status_code == 400
     assert response.json()["detail"] == "Dates cannot be in the future"
 
 
 def test_get_city_weather_by_date_range_invalid_dates(service):
-    response = client.get("/api/weather/country/AR/city/Buenos Aires/date-range?start_date=2024-01-03&end_date=2024-01-01")
+    response = client.get("/api/weather/country/city/date-range", params={"city": "Buenos Aires", "country": "AR", "start_date": "2024-01-03", "end_date": "2024-01-01"})
     
     assert response.status_code == 400
     assert response.json()["detail"] == "Start date must be before end date"
 
 
 def test_get_city_weather_by_date_range_invalid_city(service):
-    response = client.get("/api/weather/country/AR/city/InvalidCityName123/date-range?start_date=2024-01-01&end_date=2024-01-03")
+    response = client.get("/api/weather/country/city/date-range", params={"city": "InvalidCityName123", "country": "AR", "start_date": "2024-01-01", "end_date": "2024-01-03"})
     
     assert response.status_code == 404
     assert response.json()["detail"] == "City not found in country AR: InvalidCityName123"
+
+
+def test_get_weather_request_by_city_invalid_city(service):
+    city=""
+    response = client.get(f"/api/weather/country/city", params={"city": city, "country": "AR"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "City and country parameters are required"
+
+def test_get_weather_request_by_city_invalid_country(service):
+    country=""
+    response = client.get(f"/api/weather/country/city", params={"city": "Buenos Aires", "country": country})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "City and country parameters are required"
+
+def test_get_weather_request_by_city_no_data(service):
+    response = client.get(f"/api/weather/country/city", params={"city": "NonExistentCity", "country": "AR"})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+def test_get_weather_request_by_no_dates(service):
+    response = client.get("/api/weather/country/city/date-range", params={"city": "buenos aires", "country": "AR", "start_date": "", "end_date": ""})
+    
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Dates parameter are required"
+
+    response = client.get("/api/weather/country/city/date-range", params={"city": "buenos aires", "country": "AR", "start_date": "2024-06-06", "end_date": ""})
+    
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Dates parameter are required"
+
+    response = client.get("/api/weather/country/city/date-range", params={"city": "buenos aires", "country": "AR", "start_date": "", "end_date": "2024-06-06"})
+    
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Dates parameter are required"

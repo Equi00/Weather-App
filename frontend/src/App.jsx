@@ -1,4 +1,4 @@
-import { Container, Heading, VStack, Icon, Input, Button, Text, useDisclosure, Modal, ModalBody, ModalOverlay, ModalContent, ModalFooter, ModalHeader, IconButton, ModalCloseButton, Spinner } from '@chakra-ui/react'
+import { Container, Heading, VStack, Icon, Input, Button, Text, useDisclosure, Modal, ModalBody, ModalOverlay, ModalContent, ModalFooter, ModalHeader, IconButton, ModalCloseButton, Spinner, Spacer } from '@chakra-ui/react'
 import { useState } from 'react'
 import WeatherDataCardList from '../components/weatherDataCardList';
 import weatherService from '../api/weatherApi';
@@ -139,6 +139,8 @@ function App() {
           <SunIcon color="goldenrod" />
         </Heading>
         <Text fontSize="sm" textAlign="center">
+          Developed by Ezequiel Oyola
+          <Spacer/>
           The Product Manager Accelerator Program is designed to support PM professionals through every stage of their careers. From students looking for entry-level jobs to Directors looking to take on a leadership role, this program has helped over hundreds of students fulfill their career aspirations.
         </Text>
         <Text fontSize={"lg"}>Search for weather data by city and country</Text>

@@ -1,5 +1,11 @@
 # Weather Application
 
+Name: Ezequiel Oyola
+
+## PM Accelerator Mission
+
+The Product Manager Accelerator Program is designed to support PM professionals through every stage of their careers. From students looking for entry-level jobs to Directors looking to take on a leadership role, this program has helped over hundreds of students fulfill their career aspirations.
+
 ## Overview
 
 This project is a simple weather web application that allows users to create, edit, search, delete and download weather data.
